@@ -1,0 +1,66 @@
+# Colab setup
+!pip install requests pandas
+
+import requests
+import pandas as pd
+
+# Define API URLs and headers
+API_BASE_URL = 'https://getoutline.com/api'
+COLLECTION_DOCUMENTS_URL = f'{API_BASE_URL}/collections.documents'
+MOVE_DOCUMENT_URL = f'{API_BASE_URL}/documents.move'
+HEADERS = {
+    'Authorization': 'Bearer YOURKEY',
+    'Content-Type': 'application/json'
+}
+
+TARGET_COLLECTION_ID = 'YOURCOLLECTIONID'
+
+# Function to get all documents from a specific collection
+def get_all_documents(collection_id):
+    payload = {
+        'id': collection_id
+    }
+    response = requests.post(COLLECTION_DOCUMENTS_URL, headers=HEADERS, json=payload)
+    response.raise_for_status()
+    documents = response.json().get('data', [])
+    return documents
+
+# Function to move a document to a new parent
+def move_document(document_id, new_parent_id):
+    payload = {
+        'id': document_id,
+        'parentDocumentId': new_parent_id,
+        'collectionId': TARGET_COLLECTION_ID  # Use the specified collection ID
+    }
+    response = requests.post(MOVE_DOCUMENT_URL, headers=HEADERS, json=payload)
+    try:
+        response.raise_for_status()
+    except requests.exceptions.HTTPError as err:
+        print(f"Error moving document {document_id}: {err}")
+        print(f"Response content: {response.content.decode()}")
+        raise
+    return response.json()
+
+# Function to filter documents by title and move them recursively
+def filter_and_move_documents(documents, search_string, new_parent_id):
+    for document in documents:
+        if search_string in document['title']:
+            print(f"Moving document '{document['title']}' to new parent ID {new_parent_id}")
+            move_document(document['id'], new_parent_id)
+        # Recursive check for child documents
+        if 'children' in document:
+            filter_and_move_documents(document['children'], search_string, new_parent_id)
+
+# Main function to run the process
+def main(collection_id, search_string, new_parent_id):
+    documents = get_all_documents(collection_id)
+    filter_and_move_documents(documents, search_string, new_parent_id)
+    print("Process completed.")
+
+# User inputs
+collection_id = input("Enter the origin collection ID: ")
+search_string = input("Enter the string to search in document titles: ")
+new_parent_id = input("Enter the new parent document ID: ")
+
+# Run the main function
+main(collection_id, search_string, new_parent_id)
